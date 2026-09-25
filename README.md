@@ -1,99 +1,85 @@
-# RFM Analysis Project
+# Customer Segmentation using RFM Analysis
 
 ## Overview
 
-This project performs an RFM (Recency, Frequency, Monetary) analysis on customer transaction data. The goal is to segment customers into different groups based on their purchasing behavior and to derive actionable insights for targeted marketing strategies.
+This project segments customers of a UK-based online retailer into behavioral groups using RFM (Recency, Frequency, Monetary) analysis combined with K-means clustering. The goal is to move beyond treating every customer the same, and instead identify which customers are most valuable so marketing efforts can be targeted accordingly.
+
+## Dataset
+
+- **Source**: [Kaggle — ecommerce-data (carrie1)](https://www.kaggle.com/datasets/carrie1/ecommerce-data)
+- **Description**: Real transaction-level data from a UK online retailer, covering ~1 year of sales
+- **Raw size**: 541,909 transaction rows
+- **After cleaning**: 406,829 rows (dropped rows with missing CustomerID and unneeded columns)
+- **After filtering to UK market**: 361,878 rows (~89% of the cleaned dataset)
 
 ## Project Structure
 
-This project is part of the `Data-Analysis` repository, located under `Python/Customer Segregation/RFM Analysis`.
+- **Data Preparation** — cleaning, handling missing values, filtering to the UK market
+- **RFM Calculation** — computing Recency, Frequency, and Monetary values per customer
+- **Outlier Removal** — IQR-based filtering, applied separately to each metric
+- **Normalization** — min-max scaling to bring all three metrics to a 0–1 range
+- **Clustering** — K-means (K=4, chosen via the elbow method)
+- **Cluster Analysis** — profiling and naming each segment
+- **Visualization** — distribution plots, elbow plot, and a 3D PCA-based cluster plot
 
-- **Data Preparation**: Cleaning and preprocessing the data.
-- **RFM Calculation**: Computing Recency, Frequency, and Monetary values for each customer.
-- **Outlier Removal**: Removing outliers to ensure robust analysis.
-- **Normalization**: Normalizing the RFM values to bring them to a common scale.
-- **Clustering**: Applying K-means clustering to segment customers into four groups.
-- **Cluster Analysis**: Analyzing and interpreting the clusters.
-- **Visualization**: Visualizing the clusters using 3D plots.
+## Methodology
 
-## Dataset, Notebooks and Scripts
+### Data Preparation
+- Dropped `InvoiceNo`, `StockCode`, and `Description` (not needed for RFM)
+- Dropped rows with missing `CustomerID` (an unidentified customer can't be segmented)
+- Filtered to `Country == "United Kingdom"` since it accounts for the large majority of transactions, keeping the customer comparison fair
 
-- **Dataset** : Actual transactions from UK retailer. [Link to the dataset](https://www.kaggle.com/datasets/carrie1/ecommerce-data)
-- **RFM_Analysis.ipynb**: Jupyter notebook containing the full analysis.
-- **RFM_Analysis.py**: Python script converted from the Jupyter notebook.
+### RFM Calculation
+- **Recency**: days since each customer's most recent purchase (inverted after normalization so higher = more recently active)
+- **Frequency**: count of transaction line items per customer
+- **Monetary**: total spend per customer (`Quantity × UnitPrice`, summed)
 
-## Data Preparation
+### Outlier Removal
+Applied the IQR method independently to Recency, Frequency, and Monetary — any value outside `Q1 − 1.5×IQR` to `Q3 + 1.5×IQR` was removed. IQR was used over z-score because the underlying distributions (especially Monetary) are right-skewed rather than normal.
 
-1. **Loading Data**: Importing customer transaction data.
-2. **Data Cleaning**: Handling missing values and correcting data types.
-3. **Outlier Removal**:
-    - Impact on Clustering: Outliers can skew clustering results, leading to less meaningful clusters.
-    - Statistical Measures: Outliers affect the mean and standard deviation, making data less representative.
-    - Normalization and Scaling: Outliers stretch the scale, reducing the granularity of normalized values.
-    - Interpretability: Removing outliers makes results more interpretable and actionable for business decisions.
-4. **Normalization**:
-    - Equal Weighting: Ensures recency has the same scale as frequency and monetary value, giving each component equal importance.
-    - Improved Model Performance: Helps clustering algorithms work more effectively.
-    - Consistency: Brings all values into a common scale.
-    - Stability: Reduces the impact of outliers and extreme values.
+### Normalization
+Min-max scaling brought all three metrics onto a comparable 0–1 range, since K-means relies on Euclidean distance and unscaled metrics (e.g. Monetary in currency vs. Recency in days) would otherwise dominate the clustering unevenly.
 
-## RFM Calculation
+### Clustering
+K-means was run with K values from 1–10, and the elbow method (plotting inertia vs. K) identified K=4 as the point where additional clusters stopped meaningfully improving cluster tightness.
 
-- **Recency**: Calculated as the number of days since the last purchase.
-- **Frequency**: Calculated as the total number of purchases.
-- **Monetary**: Calculated as the total spend.
+## Results
 
-## Clustering
+Average normalized RFM scores per cluster:
 
-- **K-means Clustering**: Applied to the normalized RFM data to segment customers into four clusters:
-    - **True Friends**: High Recency, High Frequency, High Monetary
-    - **Butterflies**: High Recency, Low Frequency, High Monetary
-    - **Barnacles**: High Recency, High Frequency, Low Monetary
-    - **Strangers**: Low Recency, Low Frequency, Low Monetary
+| Segment | Recency | Frequency | Monetary |
+|---|---|---|---|
+| **True Friends** | 0.907 | 0.671 | 0.690 |
+| **Butterflies** | 0.890 | 0.326 | 0.528 |
+| **Barnacles** | 0.848 | 0.102 | 0.353 |
+| **Strangers** | 0.312 | 0.098 | 0.336 |
 
-## Cluster Analysis
-
-- **True Friends**: Implement loyalty programs, provide exclusive offers, and maintain personalized communication.
-- **Butterflies**: Offer special promotions, use remarketing strategies, create urgency with limited-time offers, and suggest complementary products.
-- **Barnacles**: Encourage higher spending through upselling, offer product bundles, educate on higher-value products, and provide spending incentives.
-- **Strangers**: Increase brand awareness, engage with compelling content, offer attractive promotions, and analyze further to understand their needs.
+- **True Friends** — recent, frequent, high spend → loyalty programs, exclusive offers, personalized communication
+- **Butterflies** — recent and high spend, but infrequent → remarketing, limited-time promotions, complementary product suggestions
+- **Barnacles** — engaged but low spend → upselling, product bundles, spending incentives
+- **Strangers** — disengaged across all three metrics → brand awareness campaigns, reactivation offers
 
 ## Visualization
 
-- **3D PCA Plot**: Visualizing the clusters in a 3D space using Principal Component Analysis (PCA).
+- Distribution plots (with KDE) for each normalized metric, used to check the effect of outlier removal and normalization
+- Elbow plot to justify the choice of K=4
+- 3D scatter plot of the four clusters, using PCA to project the RFM space for visualization
+
+## Tech Stack
+
+`Python`, `Pandas`, `NumPy`, `Matplotlib`, `Seaborn`, `Scikit-learn` (`KMeans`, `MinMaxScaler`, `PCA`)
 
 ## Usage
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/nehalbk/Data-Analysis.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd Data-Analysis/Python/Customer Segregation/RFM Analysis
-   ```
-3. Install the required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Run the Jupyter notebook or the Python script:
-   ```bash
-   jupyter notebook RFM_Analysis.ipynb
-   ```
-   or
-   ```bash
-   python RFM_Analysis.py
-   ```
+Or run it in Google Colab with no local install — upload `RFM_Analysis.ipynb` and `data.csv`, then run all cells in order.
 
-## Contributing
+## Key Design Decisions
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or suggestions.
+- **IQR over z-score** for outlier removal, since RFM metrics are skewed rather than normally distributed
+- **Min-max scaling over standardization**, for an interpretable 0–1 range across cluster averages
+- **K-means over other clustering methods**, for efficiency and because RFM clusters tend to be roughly spherical in shape
+- **Elbow method** used to select K, balancing cluster tightness against model simplicity
 
 ## License
 
-This project is licensed under the MIT License.
-
-## Acknowledgments
-
-- Thanks to the open-source community for providing the tools and libraries used in this project.
-- Inspired by various RFM analysis tutorials and customer segmentation strategies.
+MIT
